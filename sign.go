@@ -109,6 +109,13 @@ func (sd *SignedData) SetEncryptionAlgorithm(d asn1.ObjectIdentifier) {
 	sd.encryptionOid = d
 }
 
+// SetMessageDigest sets a pre computed message digest to be used in the signing process.
+//
+// This should be called before adding signers
+func (sd *SignedData) SetMessageDigest(d []byte) {
+	sd.messageDigest = d
+}
+
 // AddSigner is a wrapper around AddSignerChain() that adds a signer without any parent.
 func (sd *SignedData) AddSigner(ee *x509.Certificate, pkey crypto.PrivateKey, config SignerInfoConfig) error {
 	var parents []*x509.Certificate
@@ -148,9 +155,15 @@ func (sd *SignedData) AddSignerChain(ee *x509.Certificate, pkey crypto.PrivateKe
 	if err != nil {
 		return err
 	}
-	h := hash.New()
-	h.Write(sd.data)
-	sd.messageDigest = h.Sum(nil)
+
+	// if the message digest is set by SetMessageDigest,
+	// do not hash again.
+	if sd.messageDigest == nil {
+		h := hash.New()
+		h.Write(sd.data)
+		sd.messageDigest = h.Sum(nil)
+	}
+
 	if sd.encryptionOid == nil {
 		// if the encryption algorithm wasn't set by SetEncryptionAlgorithm,
 		// infer it from the digest algorithm
@@ -214,9 +227,15 @@ func (sd *SignedData) SignWithoutAttr(ee *x509.Certificate, pkey crypto.PrivateK
 	if err != nil {
 		return err
 	}
-	h := hash.New()
-	h.Write(sd.data)
-	sd.messageDigest = h.Sum(nil)
+
+	// if the message digest is set by SetMessageDigest,
+	// do not hash again.
+	if sd.messageDigest == nil {
+		h := hash.New()
+		h.Write(sd.data)
+		sd.messageDigest = h.Sum(nil)
+	}
+
 	switch pkey := pkey.(type) {
 	case *dsa.PrivateKey:
 		// dsa doesn't implement crypto.Signer so we make a special case
